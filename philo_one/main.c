@@ -6,7 +6,7 @@
 /*   By: yslati <yslati@student.1337.ma>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/16 18:09:42 by yslati            #+#    #+#             */
-/*   Updated: 2021/03/16 18:33:43 by yslati           ###   ########.fr       */
+/*   Updated: 2021/03/19 11:28:10 by yslati           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,12 +21,16 @@ int		g_die;
 int		g_eat;
 int		g_sleep;
 int		g_eatc;
-pthread_mutex_t *g_forks; 
+
+int		g_dead;
+pthread_mutex_t *g_forks;
+
 
 
 typedef struct		s_philo
 {
 	pthread_t		*th;
+	pthread_t		hl;
 	int				id;
 	long int		limit;
 	int				fork;
@@ -99,7 +103,7 @@ int			args_isnumeric(char **av, int ac)
 	return (1);
 }
 
-int		get_value(char **av, int ac)
+int			get_value(char **av, int ac)
 {
 	g_n = ft_atoi(av[1]);
 	g_die = ft_atoi(av[2]);
@@ -114,28 +118,80 @@ int		get_value(char **av, int ac)
 	return (1);
 }
 
+long int	get_time()
+{
+	struct	timeval	tv;
+	gettimeofday(&tv, NULL);
+	return ((tv.tv_sec * 1000) + (tv.tv_usec) / 1000);
+}
+
+void	*health(void *data)
+{
+	t_philo *p = data;
+	while (1)
+	{
+		if (get_time() >= p->limit)
+		{
+			g_dead = 0;
+			printf("%d is died\n", p->id + 1);
+			break;
+		}
+	}
+	return (NULL);
+}
+
+void		*routine(void *data)
+{
+	t_philo		*p;
+	int			l_fork;
+	int			r_fork;
+
+	p = data;
+	r_fork = p->id;
+	l_fork = (p->id + 1) % g_n;
+	p->limit = get_time() + g_die;
+	pthread_create(&p->hl, NULL, health, p);
+	pthread_detach(p->hl);
+	while (g_dead)
+	{
+		pthread_mutex_lock(&g_forks[r_fork]);
+		printf("%d has taken the right Fork\n", p->id + 1);
+		pthread_mutex_lock(&g_forks[l_fork]);
+		printf("%d has taken the left Fork\n", p->id + 1);
+		
+		p->limit = get_time() + g_eat;
+		printf("%d is eating\n", p->id + 1);
+		usleep(1000 * g_eat);
+		pthread_mutex_unlock(&g_forks[r_fork]);
+		pthread_mutex_unlock(&g_forks[l_fork]);
+		
+		printf("%d is sleeping\n", p->id + 1);
+		usleep(1000 * g_sleep);
+		printf("%d is thinking\n", p->id + 1);
+	}
+	return(NULL);
+}
+
 void		init_philo()
 {
 	int i;
 
 	i = -1;
 	g_ps = malloc(sizeof(t_philo) * g_n);
-	g_forks = malloc(sizeof(int) * g_n);
+	g_forks = malloc(sizeof(pthread_mutex_t) * g_n);
+	g_ps->th = malloc(sizeof(pthread_t) * g_n);
 	while (++i < g_n)
-	{
-		g_ps[i].id = i;
 		pthread_mutex_init(&g_forks[i], NULL);
-	}
-	
 }
 
 int			main(int ac,char **av)
 {
-	if (ac < 5 || ac > 6)
-	{
-		printf("wrong argument !\n");
+	int	i;
+
+	i = -1;
+	g_dead = 1;
+	if ((ac < 5 || ac > 6) && printf("wrong argument !\n"))
 		return (1);
-	}
 	else
 	{
 		if (!args_isnumeric(av, ac) || !get_value(av, ac))
@@ -144,5 +200,41 @@ int			main(int ac,char **av)
 			return (0);
 		init_philo();
 	}
+	while (++i < g_n)
+	{
+		g_ps[i].id = i;
+		pthread_create(&g_ps->th[i], NULL, routine, &g_ps[i]);
+		usleep(10);
+	}
+	while (g_dead)
+		usleep(1000);
 	return (0);
 }
+
+// pthread_mutex_t mutex;
+
+// void	*routine(void* p)
+// {
+// 	pthread_mutex_lock(&mutex);
+// 	puts("start");
+// 	sleep(3);
+// 	puts("end");
+// 	pthread_mutex_unlock(&mutex);
+// 	return NULL;
+// }
+
+
+// int main()
+// {
+// 	pthread_mutex_init(&mutex, NULL);
+// 	pthread_t thr;
+
+	
+// 	pthread_create(&thr, NULL, routine, NULL);
+// 	pthread_create(&thr, NULL, routine, NULL);
+// 	sleep(1);
+// 	pthread_mutex_lock(&mutex);
+// 	// pthread_join(thr, NULL);
+// 	puts("finish");
+
+// }
