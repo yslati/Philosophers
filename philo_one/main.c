@@ -6,7 +6,7 @@
 /*   By: yslati <yslati@student.1337.ma>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/16 18:09:42 by yslati            #+#    #+#             */
-/*   Updated: 2021/03/19 11:28:10 by yslati           ###   ########.fr       */
+/*   Updated: 2021/03/24 14:25:30 by yslati           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,10 @@ int		g_eatc;
 
 int		g_dead;
 pthread_mutex_t *g_forks;
+pthread_mutex_t g_eatLock;
+pthread_mutex_t g_sleepLock;
+pthread_mutex_t g_died;
+
 
 
 
@@ -150,24 +154,32 @@ void		*routine(void *data)
 	r_fork = p->id;
 	l_fork = (p->id + 1) % g_n;
 	p->limit = get_time() + g_die;
-	pthread_create(&p->hl, NULL, health, p);
-	pthread_detach(p->hl);
+	// pthread_mutex_lock(&g_died);
+	// pthread_create(&p->hl, NULL, health, p);
+	// pthread_detach(p->hl);
+	// pthread_mutex_unlock(&g_died);
 	while (g_dead)
 	{
 		pthread_mutex_lock(&g_forks[r_fork]);
-		printf("%d has taken the right Fork\n", p->id + 1);
 		pthread_mutex_lock(&g_forks[l_fork]);
+		printf("%d has taken the right Fork\n", p->id + 1);
 		printf("%d has taken the left Fork\n", p->id + 1);
 		
 		p->limit = get_time() + g_eat;
-		printf("%d is eating\n", p->id + 1);
+		
+		pthread_mutex_lock(&g_eatLock);
+		printf("%d eating\n", p->id + 1);
 		usleep(1000 * g_eat);
+		pthread_mutex_unlock(&g_eatLock);
+		
 		pthread_mutex_unlock(&g_forks[r_fork]);
 		pthread_mutex_unlock(&g_forks[l_fork]);
 		
-		printf("%d is sleeping\n", p->id + 1);
+		pthread_mutex_lock(&g_eatLock);
+		printf("%d sleeping\n", p->id + 1);
 		usleep(1000 * g_sleep);
-		printf("%d is thinking\n", p->id + 1);
+		pthread_mutex_unlock(&g_eatLock);
+		printf("%d thinking\n", p->id + 1);
 	}
 	return(NULL);
 }
@@ -180,6 +192,10 @@ void		init_philo()
 	g_ps = malloc(sizeof(t_philo) * g_n);
 	g_forks = malloc(sizeof(pthread_mutex_t) * g_n);
 	g_ps->th = malloc(sizeof(pthread_t) * g_n);
+	// pthread_mutex_init(&mutex_eat, NULL);
+	pthread_mutex_init(&g_eatLock, NULL);
+	pthread_mutex_init(&g_sleepLock, NULL);
+
 	while (++i < g_n)
 		pthread_mutex_init(&g_forks[i], NULL);
 }
@@ -199,17 +215,25 @@ int			main(int ac,char **av)
 		if (g_eatc == 0)
 			return (0);
 		init_philo();
+		// pthread_mutex_init(&g_died, NULL);
 	}
 	while (++i < g_n)
 	{
 		g_ps[i].id = i;
 		pthread_create(&g_ps->th[i], NULL, routine, &g_ps[i]);
-		usleep(10);
+		// pthread_detach(g_ps->th[i]);
+		// usleep(1000);
 	}
-	while (g_dead)
-		usleep(1000);
+	i = -1;
+	while (++i < g_n)
+		pthread_join(g_ps->th[i], NULL);
+	// while (g_dead)
+	// 	usleep(1000);
 	return (0);
 }
+
+
+
 
 // pthread_mutex_t mutex;
 
@@ -217,7 +241,7 @@ int			main(int ac,char **av)
 // {
 // 	pthread_mutex_lock(&mutex);
 // 	puts("start");
-// 	sleep(3);
+// 	sleep(1);
 // 	puts("end");
 // 	pthread_mutex_unlock(&mutex);
 // 	return NULL;
@@ -228,13 +252,17 @@ int			main(int ac,char **av)
 // {
 // 	pthread_mutex_init(&mutex, NULL);
 // 	pthread_t thr;
-
+// 	int i = -1;
 	
-// 	pthread_create(&thr, NULL, routine, NULL);
-// 	pthread_create(&thr, NULL, routine, NULL);
-// 	sleep(1);
+// 	// pthread_mutex_lock(&mutex);
+// 	while (++i < 5)
+// 	{
+// 		pthread_create(&thr, NULL, routine, NULL);
+// 		pthread_detach(thr);
+// 	}
 // 	pthread_mutex_lock(&mutex);
-// 	// pthread_join(thr, NULL);
+// 	// i = -1;
+// 	// while (++i < 5)
+// 	// 	pthread_join(thr[i], NULL);
 // 	puts("finish");
-
 // }
